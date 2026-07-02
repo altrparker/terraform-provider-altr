@@ -107,7 +107,7 @@ resource "altr_agent_task" "sis" {
 ### Optional
 
 - `description` (String) Optional description of the task.
-- `service_user` (String) Username of the service user the agent authenticates as when connecting to the repository.
+- `service_user` (String) Username of the service user the agent authenticates as when connecting to the repository. For SIS tasks: required for Oracle and MSSQL (and MySQL when table_name is set); must be omitted for Postgres and for MySQL when audit_file_path is set.
 
 ### Read-Only
 
@@ -120,17 +120,17 @@ resource "altr_agent_task" "sis" {
 
 Optional:
 
-- `audit_file_path` (String) SIS only. Glob path to the audit log files the agent ingests.
-- `audit_file_type` (String) SIS only. Format of the audit log files (e.g. json).
+- `audit_file_path` (String) SIS only. Absolute glob path to the audit log files the agent ingests. Required for MSSQL and Postgres; for MySQL provide exactly one of audit_file_path or table_name.
+- `audit_file_type` (String) SIS only. Format of the audit log files. Postgres accepts "log", "csv", or "json".
 - `classification_type` (Number) CLASSIFIER only. Classification engine to use: 1 (GOOGLE_DLP), 2 (SNOWFLAKE_NATIVE), or 5 (ALTR_NATIVE).
 - `collection_name` (String) CLASSIFIER only. Name of the classifier collection to use. May only be set when classification_type is 5 (ALTR_NATIVE).
 - `condition_types` (List of String) SIS only. Audit condition types to ingest.
 - `initial_audit_timestamp` (String) SIS only. Timestamp to begin audit ingestion from.
-- `log_line_prefix` (String) SIS only. log_line_prefix configured on the source database (used to parse audit lines).
+- `log_line_prefix` (String) SIS only. Postgres only. The source database's log_line_prefix, used to parse audit lines; required when audit_file_type is "log" and must be omitted otherwise.
 - `sample_strategy` (String, Deprecated) CLASSIFIER only. Sampling strategy: ROWS (row data only), METADATA (column metadata only), or COMBINED (both).
-- `service_name` (String) SIS only. Database service name the audit logs belong to.
+- `service_name` (String) SIS only. Oracle service name the audit logs belong to.
 - `ssl_config` (Attributes) SSL/TLS configuration used when connecting to the repository. (see [below for nested schema](#nestedatt--configuration--ssl_config))
-- `table_name` (String) SIS only. Target table name for audit ingestion.
+- `table_name` (String) SIS only. MySQL only. Target table for audit data; provide exactly one of table_name or audit_file_path. When table_name is set, service_user is required.
 
 <a id="nestedatt--configuration--ssl_config"></a>
 ### Nested Schema for `configuration.ssl_config`

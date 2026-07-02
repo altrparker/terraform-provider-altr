@@ -120,7 +120,7 @@ func (r *AgentTaskResource) Schema(ctx context.Context, req resource.SchemaReque
 				},
 			},
 			"service_user": schema.StringAttribute{
-				Description: "Username of the service user the agent authenticates as when connecting to the repository.",
+				Description: "Username of the service user the agent authenticates as when connecting to the repository. For SIS tasks: required for Oracle and MSSQL (and MySQL when table_name is set); must be omitted for Postgres and for MySQL when audit_file_path is set.",
 				Optional:    true,
 				Computed:    true,
 				PlanModifiers: []planmodifier.String{
@@ -154,12 +154,12 @@ func (r *AgentTaskResource) Schema(ctx context.Context, req resource.SchemaReque
 						Computed:    true,
 					},
 					"audit_file_path": schema.StringAttribute{
-						Description: "SIS only. Glob path to the audit log files the agent ingests.",
+						Description: "SIS only. Absolute glob path to the audit log files the agent ingests. Required for MSSQL and Postgres; for MySQL provide exactly one of audit_file_path or table_name.",
 						Optional:    true,
 						Computed:    true,
 					},
 					"audit_file_type": schema.StringAttribute{
-						Description: "SIS only. Format of the audit log files (e.g. json).",
+						Description: "SIS only. Format of the audit log files. Postgres accepts \"log\", \"csv\", or \"json\".",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -175,17 +175,17 @@ func (r *AgentTaskResource) Schema(ctx context.Context, req resource.SchemaReque
 						Computed:    true,
 					},
 					"log_line_prefix": schema.StringAttribute{
-						Description: "SIS only. log_line_prefix configured on the source database (used to parse audit lines).",
+						Description: "SIS only. Postgres only. The source database's log_line_prefix, used to parse audit lines; required when audit_file_type is \"log\" and must be omitted otherwise.",
 						Optional:    true,
 						Computed:    true,
 					},
 					"service_name": schema.StringAttribute{
-						Description: "SIS only. Database service name the audit logs belong to.",
+						Description: "SIS only. Oracle service name the audit logs belong to.",
 						Optional:    true,
 						Computed:    true,
 					},
 					"table_name": schema.StringAttribute{
-						Description: "SIS only. Target table name for audit ingestion.",
+						Description: "SIS only. MySQL only. Target table for audit data; provide exactly one of table_name or audit_file_path. When table_name is set, service_user is required.",
 						Optional:    true,
 						Computed:    true,
 					},
@@ -475,19 +475,29 @@ func (r *AgentTaskResource) validateConfiguration(model *AgentTaskResourceModel)
 	}
 
 	// A task must be either a CLASSIFIER task (classification_type) or a SIS
-	// audit task (audit_file_path). The task model carries no agent type, so
-	// enforce that the configuration isn't empty/ambiguous here rather than
-	// deferring to an opaque API error.
+	// task. The task model carries no agent type, and the SIS discriminator
+	// varies by repo type — audit_file_path (MSSQL/Postgres, and one MySQL
+	// option), table_name (the other MySQL option), or service_name (Oracle) —
+	// so accept any of them. This only guards against an empty/ambiguous
+	// configuration; repo-type-specific rules are enforced by the API.
 	hasClassifier := !classificationType.IsNull() && !classificationType.IsUnknown()
+	hasSIS := configHasNonEmpty(attrs, "audit_file_path") ||
+		configHasNonEmpty(attrs, "table_name") ||
+		configHasNonEmpty(attrs, "service_name")
 
-	auditFilePath := attrs["audit_file_path"].(types.String)
-	hasAudit := !auditFilePath.IsNull() && !auditFilePath.IsUnknown() && auditFilePath.ValueString() != ""
-
-	if !hasClassifier && !hasAudit {
-		return fmt.Errorf("configuration must set either 'classification_type' (CLASSIFIER task) or 'audit_file_path' (SIS task)")
+	if !hasClassifier && !hasSIS {
+		return fmt.Errorf("configuration must set 'classification_type' (CLASSIFIER task) or a SIS field (audit_file_path, table_name, or service_name)")
 	}
 
 	return nil
+}
+
+// configHasNonEmpty reports whether a string configuration attribute is set to
+// a non-empty, known value.
+func configHasNonEmpty(attrs map[string]attr.Value, key string) bool {
+	s, ok := attrs[key].(types.String)
+
+	return ok && !s.IsNull() && !s.IsUnknown() && s.ValueString() != ""
 }
 
 func (r *AgentTaskResource) configFromModel(obj basetypes.ObjectValue) client.AgentTaskConfiguration {

@@ -45,6 +45,15 @@ func (c *Client) GetAgentTask(agentID, taskID string) (*AgentTask, error) {
 
 // UpdateAgentTask updates an existing agent task
 func (c *Client) UpdateAgentTask(agentID, taskID string, input UpdateAgentTaskInput) (*AgentTask, error) {
+
+	// initial_audit_timestamp is a create-time-only field: the API rejects it in a
+	// PATCH even when unchanged. Strip it from the update payload so edits to other
+	// fields succeed. Configuration is nil when the update doesn't touch it (e.g. a
+	// name- or schedule-only change), so guard the dereference.
+	if input.Configuration != nil {
+		input.Configuration.InitialAuditTimestamp = ""
+	}
+
 	resp, err := c.makeRequest(http.MethodPatch, fmt.Sprintf("/agents/%s/tasks/%s", url.PathEscape(agentID), url.PathEscape(taskID)), input, "sidecar")
 	if err != nil {
 		return nil, fmt.Errorf("failed to update agent task: %w", err)

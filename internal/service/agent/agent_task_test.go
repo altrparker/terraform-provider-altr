@@ -96,6 +96,52 @@ func TestAccAgentTaskResource_sis(t *testing.T) {
 	})
 }
 
+// TestAccAgentTaskResource_sisUpdate covers updating a SIS task that has
+// initial_audit_timestamp set. The API rejects that field in a PATCH, so an
+// update to any other field must strip it from the payload and still succeed.
+// It exercises both the config-changing path (Configuration sent) and the
+// non-config path (Configuration nil in the client), and asserts the stored
+// timestamp survives the round-trip.
+func TestAccAgentTaskResource_sisUpdate(t *testing.T) {
+	resourceName := "altr_agent_task.test"
+	prefix := acctest.RandomWithPrefixUnderscoreMaxLength("task_sisupd", 24)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { acctest.PreCheck(t) },
+		ProtoV6ProviderFactories: acctest.ProtoV6ProviderFactories,
+		CheckDestroy:             testAccCheckAgentTaskDestroy,
+		Steps: []resource.TestStep{
+			{
+				Config: testAccAgentTaskResourceConfig_sisTimestamp(prefix, "json", "initial"),
+				Check: resource.ComposeTestCheckFunc(
+					testAccCheckAgentTaskExists(resourceName),
+					resource.TestCheckResourceAttr(resourceName, "configuration.initial_audit_timestamp", "2026-01-01T00:00:00Z"),
+					resource.TestCheckResourceAttr(resourceName, "configuration.audit_file_type", "json"),
+				),
+			},
+			{
+				// Config-field change: Configuration IS sent, so the client must
+				// strip initial_audit_timestamp from the PATCH; update must succeed
+				// and the stored timestamp must be preserved.
+				Config: testAccAgentTaskResourceConfig_sisTimestamp(prefix, "csv", "initial"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "configuration.audit_file_type", "csv"),
+					resource.TestCheckResourceAttr(resourceName, "configuration.initial_audit_timestamp", "2026-01-01T00:00:00Z"),
+				),
+			},
+			{
+				// Non-config change (description only): Configuration is nil in the
+				// client — exercises the nil guard.
+				Config: testAccAgentTaskResourceConfig_sisTimestamp(prefix, "csv", "updated"),
+				Check: resource.ComposeTestCheckFunc(
+					resource.TestCheckResourceAttr(resourceName, "description", "updated"),
+					resource.TestCheckResourceAttr(resourceName, "configuration.initial_audit_timestamp", "2026-01-01T00:00:00Z"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccAgentTaskResource_update(t *testing.T) {
 	resourceName := "altr_agent_task.test"
 	prefix := acctest.RandomWithPrefixUnderscoreMaxLength("task_test", 24)
@@ -334,6 +380,43 @@ resource "altr_agent_task" "test" {
   }
 }
 `, prefix, testAgentPublicKey1)
+}
+
+func testAccAgentTaskResourceConfig_sisTimestamp(prefix, auditFileType, description string) string {
+	return fmt.Sprintf(`
+resource "altr_repo" "test" {
+  name     = "%[1]s_repo"
+  hostname = "test-host"
+  port     = 5432
+  type     = "Postgres"
+}
+
+resource "altr_agent" "test" {
+  type         = "SIS"
+  name         = "%[1]s_agent"
+  public_key_1 = <<-EOT
+%[2]s
+EOT
+}
+
+resource "altr_agent_task" "test" {
+  agent_id    = altr_agent.test.id
+  name        = "%[1]s_task"
+  description = %[4]q
+  repo_name   = altr_repo.test.name
+
+  configuration = {
+    audit_file_path         = "/var/lib/postgresql/audit/*.json"
+    audit_file_type         = %[3]q
+    initial_audit_timestamp = "2026-01-01T00:00:00Z"
+  }
+
+  schedule = {
+    type  = "CRON"
+    value = "*/5 * * * *"
+  }
+}
+`, prefix, testAgentPublicKey1, auditFileType, description)
 }
 
 func testAccAgentTaskResourceConfig_invalidScheduleType(prefix string) string {
