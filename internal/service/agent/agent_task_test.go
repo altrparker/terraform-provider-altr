@@ -184,6 +184,21 @@ func TestAccAgentTaskResource_scheduleTypeValidation(t *testing.T) {
 	})
 }
 
+func TestAccAgentTaskResource_classificationTypeValidation(t *testing.T) {
+	prefix := acctest.RandomWithPrefixUnderscoreMaxLength("task_test", 24)
+
+	resource.Test(t, resource.TestCase{
+		PreCheck:                 func() { acctest.PreCheck(t) },
+		ProtoV6ProviderFactories: acctest.ProtoV6ProviderFactories,
+		Steps: []resource.TestStep{
+			{
+				Config:      testAccAgentTaskResourceConfig_invalidClassificationType(prefix),
+				ExpectError: regexp.MustCompile(`classification_type[\s\S]*value must be one of`),
+			},
+		},
+	})
+}
+
 func TestAccAgentTaskResource_disappears(t *testing.T) {
 	resourceName := "altr_agent_task.test"
 	prefix := acctest.RandomWithPrefixUnderscoreMaxLength("task_test", 24)
@@ -436,6 +451,28 @@ resource "altr_agent_task" "test" {
   schedule = {
     type  = "INTERVAL"
     value = "0 0 * * *"
+  }
+}
+`, prefix)
+}
+
+func testAccAgentTaskResourceConfig_invalidClassificationType(prefix string) string {
+	return testAccAgentTaskResourceConfig_base(prefix) + fmt.Sprintf(`
+resource "altr_agent_task" "test" {
+  agent_id     = altr_agent.test.id
+  name         = "%[1]s_task"
+  repo_name    = altr_repo.test.name
+  service_user = altr_service_user.test.username
+
+  configuration = {
+    classification_type = 2
+    sample_strategy     = "ROWS"
+  }
+
+  schedule = {
+    type         = "CRON"
+    value        = "0 0 * * *"
+    max_duration = "PT30M"
   }
 }
 `, prefix)

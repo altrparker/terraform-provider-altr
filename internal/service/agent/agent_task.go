@@ -132,11 +132,11 @@ func (r *AgentTaskResource) Schema(ctx context.Context, req resource.SchemaReque
 				Required:    true,
 				Attributes: map[string]schema.Attribute{
 					"classification_type": schema.Int64Attribute{
-						Description: "CLASSIFIER only. Classification engine to use: 1 (GOOGLE_DLP), 2 (SNOWFLAKE_NATIVE), or 5 (ALTR_NATIVE).",
+						Description: "CLASSIFIER only. Classification engine to use: 5 (ALTR_NATIVE).",
 						Optional:    true,
 						Computed:    true,
 						Validators: []validator.Int64{
-							int64validator.OneOf(1, 2, 5),
+							int64validator.OneOf(5),
 						},
 					},
 					"sample_strategy": schema.StringAttribute{
@@ -149,7 +149,7 @@ func (r *AgentTaskResource) Schema(ctx context.Context, req resource.SchemaReque
 						},
 					},
 					"collection_name": schema.StringAttribute{
-						Description: "CLASSIFIER only. Name of the classifier collection to use. May only be set when classification_type is 5 (ALTR_NATIVE).",
+						Description: "CLASSIFIER only. Name of the classifier collection to use with ALTR_NATIVE classification.",
 						Optional:    true,
 						Computed:    true,
 					},

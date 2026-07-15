@@ -122,8 +122,8 @@ Optional:
 
 - `audit_file_path` (String) SIS only. Absolute glob path to the audit log files the agent ingests. Required for MSSQL and Postgres; for MySQL provide exactly one of audit_file_path or table_name.
 - `audit_file_type` (String) SIS only. Format of the audit log files. Postgres accepts "log", "csv", or "json".
-- `classification_type` (Number) CLASSIFIER only. Classification engine to use: 1 (GOOGLE_DLP), 2 (SNOWFLAKE_NATIVE), or 5 (ALTR_NATIVE).
-- `collection_name` (String) CLASSIFIER only. Name of the classifier collection to use. May only be set when classification_type is 5 (ALTR_NATIVE).
+- `classification_type` (Number) CLASSIFIER only. Classification engine to use: 5 (ALTR_NATIVE).
+- `collection_name` (String) CLASSIFIER only. Name of the classifier collection to use with ALTR_NATIVE classification.
 - `condition_types` (List of String) SIS only. Audit condition types to ingest.
 - `initial_audit_timestamp` (String) SIS only. Timestamp to begin audit ingestion from.
 - `log_line_prefix` (String) SIS only. Postgres only. The source database's log_line_prefix, used to parse audit lines; required when audit_file_type is "log" and must be omitted otherwise.
